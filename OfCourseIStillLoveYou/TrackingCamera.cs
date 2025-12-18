@@ -95,13 +95,6 @@ namespace OfCourseIStillLoveYou
 
         public void UpdateCameras()
         {
-            const int nearCameraAtmosphereLayersMask = (1 << 9) | (1 << 10) | (1 << 15);
-
-            if (MapView.MapIsEnabled)
-                _cameras[0].cullingMask &= ~nearCameraAtmosphereLayersMask;
-            else
-                _cameras[0].cullingMask |= nearCameraAtmosphereLayersMask;
-
             for (int i = _cameras.Count - 1; i >= 0; --i)
                 if (_cameras[i] != null)
                     _cameras[i].Render();
@@ -113,17 +106,11 @@ namespace OfCourseIStillLoveYou
 
         public void LateUpdateCameras()
         {
-            // for (int i = _cameras.Count - 1; i >= 0; --i)
-            // {
-            //     if (_cameras[i] != null)
-            //     {
-            //         ScattererWrapper.ForceEnableScattererComponents(_cameras[i]);
-            //         ScattererOceanHelper.UpdateOceanForCamera(_cameras[i]);
-            //     }
-            // }
+            ScattererWrapper.ForceEnableScattererComponents(_cameras[0]);
+            ScattererOceanHelper.UpdateOceanForCamera(_cameras[0]);
 
-            // ScattererWrapper.ForceEnableScattererComponents(_cameras[0]);
-            // ScattererOceanHelper.UpdateOceanForCamera(_cameras[0]);
+            ParallaxWrapper.RenderParallaxToCustomCameras(new Camera[] { _cameras[0] });
+            FireflyWrapper.UpdateFireflyForCamera(_cameras[0], _hullcamera.vessel);
         }
 
         public void SendCameraImage()
@@ -168,6 +155,7 @@ namespace OfCourseIStillLoveYou
             _windowHeight = _adjCamImageHeightSize + 23;
             _windowRect = new Rect(Screen.width - _windowWidth, Screen.height - _windowHeight, _windowWidth,
                 _windowHeight);
+
             SetCameras();
 
             ResizeTargetWindow();
@@ -190,6 +178,7 @@ namespace OfCourseIStillLoveYou
             //     _adjCamImageHeightSize = 360;
             // }
 
+            // always use square gui window
             _initialCamImageWidthSize = _initialCamImageHeightSize =
                 _adjCamImageWidthSize = _adjCamImageHeightSize = MaxCameraSize;
 
@@ -282,7 +271,6 @@ namespace OfCourseIStillLoveYou
             TufxWrapper.AddPostProcessing(partScaledCamera);
             DeferredWrapper.EnableDeferredRendering(partScaledCamera);
             DeferredWrapper.SyncDebugMode(partScaledCamera);
-            //ParallaxWrapper.ApplyParallaxToCamera(partScaledCamera, mainSkyCam);
 
             // Sync rotation with near camera
             var camRotator = cam2Obj.AddComponent<TgpCamRotator>();
@@ -314,7 +302,6 @@ namespace OfCourseIStillLoveYou
             TufxWrapper.AddPostProcessing(galaxyCam);
             DeferredWrapper.EnableDeferredRendering(galaxyCam);
             DeferredWrapper.SyncDebugMode(galaxyCam);
-            //ParallaxWrapper.ApplyParallaxToCamera(galaxyCam, mainGalaxyCam);
 
             var camRotatorGalaxy = galaxyCamObj.AddComponent<TgpCamRotator>();
             camRotatorGalaxy.NearCamera = partNearCamera;
@@ -323,13 +310,11 @@ namespace OfCourseIStillLoveYou
             // === VISUAL EFFECTS (Apply to all cameras) ===
 
             // Scatterer (atmosphere, ocean)
-            // ScattererWrapper.ApplyScattererToCamera(partNearCamera);
-            // ScattererWrapper.ApplyScattererToCamera(partScaledCamera);
-            // ScattererWrapper.ApplyScattererToCamera(galaxyCam);
+            ScattererWrapper.ApplyScattererToCamera(partNearCamera);
 
             // Initialize Scatterer ocean rendering
-            // if (ScattererWrapper.IsScattererAvailable)
-                // ScattererOceanHelper.FindOceanNode(_hullcamera.vessel.mainBody.name);
+            if (ScattererWrapper.IsScattererAvailable)
+                ScattererOceanHelper.FindOceanNode(_hullcamera.vessel.mainBody.name);
 
             // Scatterer SunFlare
             try
@@ -678,7 +663,7 @@ namespace OfCourseIStillLoveYou
                     EVEWrapper.RemoveEVEFromCamera(_cameras[i]);
 
                     // Disable Scatterer wrapper
-                    // ScattererWrapper.RemoveScattererFromCamera(_cameras[i]);
+                    ScattererWrapper.RemoveScattererFromCamera(_cameras[i]);
 
                     // Disable Firefly wrapper and cleanup tracking
                     FireflyWrapper.RemoveFireflyFromCamera(_cameras[i]);
@@ -694,28 +679,6 @@ namespace OfCourseIStillLoveYou
             }
 
             _cameras.Clear();
-        }
-
-        public void UpdateFireflyEffects()
-        {
-            // foreach (var cam in _cameras)
-            // {
-            //     if (cam != null)
-            //     {
-            //         FireflyWrapper.UpdateFireflyForCamera(cam, _hullcamera.vessel);
-            //     }
-            // }
-
-            FireflyWrapper.UpdateFireflyForCamera(_cameras[0], _hullcamera.vessel);
-        }
-
-        public void RenderParallaxScatters()
-        {
-            // Parallax requires explicit render calls to display scatter objects (grass, rocks, trees)
-            // This is called every frame from Core.Refresh()
-            // ParallaxWrapper.RenderParallaxToCustomCameras(_cameras);
-
-            ParallaxWrapper.RenderParallaxToCustomCameras(new Camera[] { _cameras[0] });
         }
     }
 }

@@ -90,17 +90,6 @@ namespace OfCourseIStillLoveYou
 
             try
             {
-                int originalMask = targetCamera.cullingMask;
-
-                // Add Scatterer layers (9 and 15)
-                targetCamera.cullingMask |= (1 << 9);
-                targetCamera.cullingMask |= (1 << 15);
-
-                if (originalMask != targetCamera.cullingMask)
-                {
-                    Debug.Log($"[OfCourseIStillLoveYou]: Updated {targetCamera.name} culling mask for Scatterer (added layers 9, 15)");
-                }
-
                 Debug.Log($"[OfCourseIStillLoveYou]: Scatterer will auto-register to {targetCamera.name} when objects are visible");
 
                 UnityEngine.Object.FindObjectOfType<MonoBehaviour>()?.StartCoroutine(CheckScattererComponentsDelayed(targetCamera));
@@ -247,9 +236,6 @@ namespace OfCourseIStillLoveYou
                 return "Scatterer not available";
 
             var info = $"Scatterer Integration for {camera.name}:\n";
-
-            info += $"- Culling mask includes layer 9: {(camera.cullingMask & (1 << 9)) != 0}\n";
-            info += $"- Culling mask includes layer 15: {(camera.cullingMask & (1 << 15)) != 0}\n";
 
             try
             {

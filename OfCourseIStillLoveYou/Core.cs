@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using HullcamVDS;
@@ -16,6 +17,11 @@ namespace OfCourseIStillLoveYou
 
         private float _cameraFpsLimit = Settings.FpsLimit > 0 ? Settings.FpsLimit : 24;
         public float _lastUpdateTime = 0f;
+
+        void Start()
+        {
+            StartCoroutine(InitPQS()); // fixes atmosphere issues after loading game in-orbit
+        }
 
         private void Awake()
         {
@@ -94,10 +100,6 @@ namespace OfCourseIStillLoveYou
             foreach (var trackedCamerasValue in TrackedCameras.Values.Where(trackedCamerasValue => trackedCamerasValue.Enabled))
             {
                 trackedCamerasValue.LateUpdateCameras();
-
-                trackedCamerasValue.RenderParallaxScatters();
-                trackedCamerasValue.UpdateFireflyEffects();
-
                 trackedCamerasValue.SendCameraImage();
             }
         }
@@ -108,6 +110,23 @@ namespace OfCourseIStillLoveYou
             {
                 trackedCamerasValue.UpdateCameras();
             }
+        }
+
+        private IEnumerator InitPQS()
+        {
+            while (!FlightGlobals.ready)
+                yield return null;
+
+            CelestialBody body = FlightGlobals.currentMainBody;
+            if (body == null)
+                yield break;
+
+            PQS pqs = body.pqsController;
+            if (pqs == null)
+                yield break;
+
+            pqs.SetTarget(body.transform);
+            pqs.ActivateSphere();
         }
     }
 }
