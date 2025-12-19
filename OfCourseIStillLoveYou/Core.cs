@@ -20,7 +20,7 @@ namespace OfCourseIStillLoveYou
 
         void Start()
         {
-            StartCoroutine(InitPQS()); // fixes atmosphere issues after loading game in-orbit
+            StartCoroutine(InitPQS()); // fixes atmosphere issues after re-loading game
         }
 
         private void Awake()
@@ -71,7 +71,7 @@ namespace OfCourseIStillLoveYou
             foreach (var trackedCamerasValue in TrackedCameras.Values.Where(trackedCamerasValue => trackedCamerasValue.Enabled))
             {
                 trackedCamerasValue.CalculateSpeedAltitude();
-                trackedCamerasValue.UpdateTargetText();
+                trackedCamerasValue.UpdateDockingOverlay();
             }
         }
 
@@ -123,6 +123,9 @@ namespace OfCourseIStillLoveYou
 
             PQS pqs = body.pqsController;
             if (pqs == null)
+                yield break;
+
+            if (pqs.isStarted && pqs.isActive)
                 yield break;
 
             pqs.SetTarget(body.transform);

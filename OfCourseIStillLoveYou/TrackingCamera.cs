@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Drawing.Printing;
 using System.Linq;
@@ -43,7 +44,7 @@ namespace OfCourseIStillLoveYou
         public double targetVelZ;
 
         private Canvas _uiCanvas;
-        private Text _targetDataText;
+        private Text _dockingOverlayText;
 
         HullcamVDS.CameraFilter.eCameraMode cameraMode;
 
@@ -106,8 +107,8 @@ namespace OfCourseIStillLoveYou
 
         public void LateUpdateCameras()
         {
-            ScattererWrapper.ForceEnableScattererComponents(_cameras[0]);
-            ScattererOceanHelper.UpdateOceanForCamera(_cameras[0]);
+            //ScattererWrapper.ForceEnableScattererComponents(_cameras[0]);
+            //ScattererOceanHelper.UpdateOceanForCamera(_cameras[0]);
 
             ParallaxWrapper.RenderParallaxToCustomCameras(new Camera[] { _cameras[0] });
             FireflyWrapper.UpdateFireflyForCamera(_cameras[0], _hullcamera.vessel);
@@ -165,6 +166,8 @@ namespace OfCourseIStillLoveYou
 
         private void CalculateInitialSize()
         {
+            // always use square gui window
+
             // if (Settings.Width > Settings.Height)
             // {
             //     _adjCamImageHeightSize = Settings.Height * MaxCameraSize / Settings.Width;
@@ -178,7 +181,6 @@ namespace OfCourseIStillLoveYou
             //     _adjCamImageHeightSize = 360;
             // }
 
-            // always use square gui window
             _initialCamImageWidthSize = _initialCamImageHeightSize =
                 _adjCamImageWidthSize = _adjCamImageHeightSize = MaxCameraSize;
 
@@ -204,16 +206,6 @@ namespace OfCourseIStillLoveYou
         public string AltitudeString { get; private set; }
         public string SpeedString { get; private set; }
         public bool StreamingEnabled { get; private set; }
-
-        private void SetCameraMode(Camera camera)
-        {
-            var filter = camera.gameObject.AddComponent<MovieTimeFilterWrapper>();
-            if (filter != null)
-            {
-                filter.Initialize(camera.name + "Filter", MovieTimeFilterWrapper.eFilterType.Flight);
-                filter.SetMode(cameraMode);
-            }
-        }
 
         private void SetCameras()
         {
@@ -307,14 +299,14 @@ namespace OfCourseIStillLoveYou
             camRotatorGalaxy.NearCamera = partNearCamera;
             galaxyCamObj.AddComponent<CanvasHack>();
 
-            // === VISUAL EFFECTS (Apply to all cameras) ===
+            // === VISUAL EFFECTS (Apply to NearCamera) ===
 
             // Scatterer (atmosphere, ocean)
-            ScattererWrapper.ApplyScattererToCamera(partNearCamera);
+            //ScattererWrapper.ApplyScattererToCamera(partNearCamera);
 
             // Initialize Scatterer ocean rendering
-            if (ScattererWrapper.IsScattererAvailable)
-                ScattererOceanHelper.FindOceanNode(_hullcamera.vessel.mainBody.name);
+            //if (ScattererWrapper.IsScattererAvailable)
+            //    ScattererOceanHelper.FindOceanNode(_hullcamera.vessel.mainBody.name);
 
             // Scatterer SunFlare
             try
@@ -330,16 +322,12 @@ namespace OfCourseIStillLoveYou
 
             // EVE (clouds, water effects)
             EVEWrapper.ApplyEVEToCamera(partNearCamera, mainCamera);
-            // EVEWrapper.ApplyEVEToCamera(partScaledCamera, mainSkyCam);
-            // EVEWrapper.ApplyEVEToCamera(galaxyCam, mainGalaxyCam);
 
             cameraMode = (HullcamVDS.CameraFilter.eCameraMode)_hullcamera.cameraMode;
-            SetCameraMode(partNearCamera);
-            //SetCameraMode(partScaledCamera);
-            //SetCameraMode(galaxyCam);
+            ApplyCameraFilter(partNearCamera);
 
             if (cameraMode == HullcamVDS.CameraFilter.eCameraMode.DockingCam)
-                AttachTargetDataToCamera(partNearCamera);
+                AttachDockingOverlayToCamera(partNearCamera);
 
             // === SET CAMERA NAMES (MUST BE LAST - CopyFrom overwrites names) ===
             _cameras[0].name = "jrNear";
@@ -347,7 +335,17 @@ namespace OfCourseIStillLoveYou
             _cameras[2].name = "jrGalaxy";
         }
 
-        private void AttachTargetDataToCamera(Camera camera)
+        private void ApplyCameraFilter(Camera camera)
+        {
+            var filter = camera.gameObject.AddComponent<MovieTimeFilterWrapper>();
+            if (filter != null)
+            {
+                filter.Initialize(camera.name + "Filter", MovieTimeFilterWrapper.eFilterType.Flight);
+                filter.SetMode(cameraMode);
+            }
+        }
+
+        private void AttachDockingOverlayToCamera(Camera camera)
         {
             int uiLayer = LayerMask.NameToLayer("UI");
             if (uiLayer == -1) uiLayer = 5;
@@ -366,7 +364,7 @@ namespace OfCourseIStillLoveYou
             var scaler = uiGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
 
-            var tgtGO = new GameObject("TargetDataText");
+            var tgtGO = new GameObject("DockingOverlay");
             tgtGO.layer = uiLayer;
             tgtGO.transform.SetParent(uiGo.transform, false);
 
@@ -374,14 +372,14 @@ namespace OfCourseIStillLoveYou
             outline.effectColor = Color.black;
             outline.effectDistance = new Vector2(2, -2);
 
-            _targetDataText = tgtGO.AddComponent<Text>();
-            _targetDataText.font = Font.CreateDynamicFontFromOSFont("Courier New", 16);
-            _targetDataText.fontSize = 2 * (int)Mathf.Clamp(16 * TargetWindowScale, 9, 16);
-            _targetDataText.alignment = TextAnchor.UpperLeft;
-            _targetDataText.color = Color.white;
-            _targetDataText.raycastTarget = false;
+            _dockingOverlayText = tgtGO.AddComponent<Text>();
+            _dockingOverlayText.font = Font.CreateDynamicFontFromOSFont("Courier New", 16);
+            _dockingOverlayText.fontSize = 2 * (int)Mathf.Clamp(16 * TargetWindowScale, 9, 16);
+            _dockingOverlayText.alignment = TextAnchor.UpperLeft;
+            _dockingOverlayText.color = Color.white;
+            _dockingOverlayText.raycastTarget = false;
 
-            var rtTgt = _targetDataText.rectTransform;
+            var rtTgt = _dockingOverlayText.rectTransform;
             rtTgt.anchorMin = new Vector2(0f, 1f);
             rtTgt.anchorMax = new Vector2(0f, 1f);
             rtTgt.pivot = new Vector2(0f, 1f);
@@ -531,10 +529,10 @@ namespace OfCourseIStillLoveYou
             SpeedString = string.Concat(Speed, speed, Kmh);
         }
 
-        public void UpdateTargetText()
+        public void UpdateDockingOverlay()
         {
             HasTargetData = (FlightGlobals.ActiveVessel.targetObject is Vessel || FlightGlobals.ActiveVessel.targetObject is ModuleDockingNode);
-            if (_targetDataText != null)
+            if (_dockingOverlayText != null)
             {
                 if (HasTargetData)
                 {
@@ -556,7 +554,7 @@ namespace OfCourseIStillLoveYou
 
                     targetDistance = (activeVesselPos - targetVesselPos).magnitude;
 
-                    _targetDataText.text =
+                    _dockingOverlayText.text =
                         $"Target: {targetName}"                                    + "\n" +
                         $"DST:    {Math.Round(targetDistance, 2)} m"               + "\n" +
                         $"TCA:    "                                                + "\n" +
@@ -568,7 +566,8 @@ namespace OfCourseIStillLoveYou
                 }
                 else
                 {
-                    _targetDataText.text = "";
+                    _dockingOverlayText.text =
+                        $"Target: None";
                 }
             }
         }
@@ -623,7 +622,7 @@ namespace OfCourseIStillLoveYou
             {
                 UnityEngine.Object.Destroy(_uiCanvas.gameObject);
                 _uiCanvas = null;
-                _targetDataText = null;
+                _dockingOverlayText = null;
             }
 
             if (TargetCamRenderTexture != null)
@@ -663,11 +662,7 @@ namespace OfCourseIStillLoveYou
                     EVEWrapper.RemoveEVEFromCamera(_cameras[i]);
 
                     // Disable Scatterer wrapper
-                    ScattererWrapper.RemoveScattererFromCamera(_cameras[i]);
-
-                    // Disable Firefly wrapper and cleanup tracking
-                    FireflyWrapper.RemoveFireflyFromCamera(_cameras[i]);
-                    FireflyWrapper.CleanupCamera(_cameras[i]);
+                    //ScattererWrapper.RemoveScattererFromCamera(_cameras[i]);
 
                     // Disable Firefly wrapper and cleanup tracking
                     FireflyWrapper.RemoveFireflyFromCamera(_cameras[i]);
