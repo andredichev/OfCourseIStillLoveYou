@@ -71,7 +71,6 @@ namespace OfCourseIStillLoveYou
             foreach (var trackedCamerasValue in TrackedCameras.Values.Where(trackedCamerasValue => trackedCamerasValue.Enabled))
             {
                 trackedCamerasValue.CalculateSpeedAltitude();
-                trackedCamerasValue.UpdateDockingOverlay();
             }
         }
 

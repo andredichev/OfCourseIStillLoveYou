@@ -1,8 +1,8 @@
 ﻿using HullcamVDS;
+using System;
 using System.Reflection;
 using UnityEngine;
-using static HullcamVDS.MovieTimeFilter;
-using static KSP.UI.Screens.RDArchivesController;
+using UnityEngine.UI;
 
 namespace OfCourseIStillLoveYou
 {
@@ -42,45 +42,16 @@ namespace OfCourseIStillLoveYou
 
         private Material _shader = null;
 
-        //private Rect guiRect = new Rect(100, 100, 400, 200);
+        private Canvas _uiCanvas;
+        private Text _dockingOverlayText;
 
-        //public void OnGUI()
-        //{
-        //    guiRect = GUI.Window(987654, guiRect, DrawWindow, "Camera Filter");
-        //}
-
-        //private void DrawWindow(int id)
-        //{
-        //    GUILayout.BeginVertical();
-
-        //    // --- Brightness ---
-        //    GUILayout.BeginHorizontal();
-        //    GUILayout.Label("Brightness", GUILayout.Width(80));
-
-        //    brightness = GUILayout.HorizontalSlider(brightness, 0f, 2f, GUILayout.Width(200));
-
-        //    string bStr = GUILayout.TextField(brightness.ToString("0.00"), GUILayout.Width(50));
-        //    if (float.TryParse(bStr, out float bVal))
-        //        brightness = Mathf.Clamp(bVal, 0f, 2f);
-
-        //    GUILayout.EndHorizontal();
-
-        //    // --- Contrast ---
-        //    GUILayout.BeginHorizontal();
-        //    GUILayout.Label("Contrast", GUILayout.Width(80));
-
-        //    contrast = GUILayout.HorizontalSlider(contrast, 0f, 4f, GUILayout.Width(200));
-
-        //    string cStr = GUILayout.TextField(contrast.ToString("0.00"), GUILayout.Width(50));
-        //    if (float.TryParse(cStr, out float cVal))
-        //        contrast = Mathf.Clamp(cVal, 0f, 4f);
-
-        //    GUILayout.EndHorizontal();
-
-        //    GUILayout.EndVertical();
-
-        //    GUI.DragWindow();
-        //}
+        private bool HasTargetData = false;
+        private string targetName;
+        private double targetDistance = double.NaN;
+        private double targetRelVelocity = double.NaN;
+        private double targetVelX;
+        private double targetVelY;
+        private double targetVelZ;
 
         public MovieTimeFilterWrapper() { }
 
@@ -182,8 +153,9 @@ namespace OfCourseIStillLoveYou
 
         public void Update()
         {
-
+            UpdateDockingOverlayText();
         }
+
         public void LateUpdate()
         {
             if (cameraFilter != null)
@@ -272,6 +244,109 @@ namespace OfCourseIStillLoveYou
             else if (currentMode == eFilterType.Flight && MapView.MapIsEnabled)
                 return eFilterType.Map;
             return currentMode;
+        }
+
+        public void AttachDockingOverlayToCamera(Camera camera, float displayWidth, float displayHeight, float targetWindowScale)
+        {
+            const int customUiLayer = 31;
+            camera.cullingMask |= 1 << customUiLayer;
+
+            GameObject overlayGo = new GameObject("OCISLY_Overlay");
+            overlayGo.layer = customUiLayer;
+            overlayGo.transform.SetParent(camera.transform, false);
+
+            _uiCanvas = overlayGo.AddComponent<Canvas>();
+            _uiCanvas.renderMode = RenderMode.ScreenSpaceCamera;
+            _uiCanvas.worldCamera = camera;
+            _uiCanvas.planeDistance = 0.1f;
+
+            var scaler = overlayGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
+
+            var tgtGO = new GameObject("DockingOverlay");
+            tgtGO.layer = customUiLayer;
+            tgtGO.transform.SetParent(overlayGo.transform, false);
+
+            var outline = tgtGO.AddComponent<Outline>();
+            outline.effectColor = Color.black;
+            outline.effectDistance = new Vector2(2, -2);
+
+            _dockingOverlayText = tgtGO.AddComponent<Text>();
+            _dockingOverlayText.font = Font.CreateDynamicFontFromOSFont("Courier New", 16);
+            _dockingOverlayText.fontSize = 2 * (int)Mathf.Clamp(16 * targetWindowScale, 9, 16);
+            _dockingOverlayText.alignment = TextAnchor.UpperLeft;
+            _dockingOverlayText.color = Color.white;
+            _dockingOverlayText.raycastTarget = false;
+
+            var rtTgt = _dockingOverlayText.rectTransform;
+            rtTgt.anchorMin = new Vector2(0f, 1f);
+            rtTgt.anchorMax = new Vector2(0f, 1f);
+            rtTgt.pivot = new Vector2(0f, 1f);
+
+            float texW = Settings.Width;
+            float texH = Settings.Height;
+            float scale = Mathf.Max(displayWidth / texW, displayHeight / texH);
+            float visibleW = displayWidth / scale;
+            float visibleH = displayHeight / scale;
+            float offsetX = (texW - visibleW) / 2f;
+            float offsetY = (texH - visibleH) / 2f;
+
+            float padding = 5f;
+            rtTgt.anchoredPosition = new Vector2(offsetX + padding, -offsetY - padding);
+            rtTgt.sizeDelta = new Vector2(visibleW - 2f * padding, visibleH - 2f * padding);
+        }
+
+        private void UpdateDockingOverlayText()
+        {
+            HasTargetData = (FlightGlobals.ActiveVessel.targetObject is Vessel || FlightGlobals.ActiveVessel.targetObject is ModuleDockingNode);
+            if (_dockingOverlayText != null)
+            {
+                if (HasTargetData)
+                {
+                    targetName = FlightGlobals.fetch.VesselTarget.GetName();
+                    targetVelX = Math.Round(Vector3d.Dot(FlightGlobals.ship_tgtVelocity, FlightGlobals.ActiveVessel.ReferenceTransform.right), 3);
+                    targetVelY = Math.Round(Vector3d.Dot(FlightGlobals.ship_tgtVelocity, FlightGlobals.ActiveVessel.ReferenceTransform.forward), 3);
+                    targetVelZ = Math.Round(Vector3d.Dot(FlightGlobals.ship_tgtVelocity, FlightGlobals.ActiveVessel.ReferenceTransform.up), 3);
+
+                    Vessel targetVessel;
+                    if (FlightGlobals.ActiveVessel.targetObject is Vessel)
+                        targetVessel = (Vessel)FlightGlobals.ActiveVessel.targetObject;
+                    else
+                        targetVessel = ((ModuleDockingNode)FlightGlobals.ActiveVessel.targetObject).vessel;
+                    Orbit activeOrbit = FlightGlobals.ActiveVessel.orbit;
+                    Orbit targetOrbit = targetVessel.orbit;
+
+                    Vector3d activeVesselPos = FlightGlobals.ActiveVessel.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime()) + FlightGlobals.ActiveVessel.orbit.referenceBody.position;
+                    Vector3d targetVesselPos = targetVessel.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime()) + targetVessel.orbit.referenceBody.position;
+
+                    targetDistance = (activeVesselPos - targetVesselPos).magnitude;
+
+                    _dockingOverlayText.text =
+                        $"Target: {targetName}" + "\n" +
+                        $"DST:    {Math.Round(targetDistance, 2)} m" + "\n" +
+                        $"TCA:    " + "\n" +
+                        $"" + "\n" +
+                        $"Relative Speed" + "\n" +
+                        $"X: {(targetVelX > 0 ? " " : "-")}{Math.Abs(targetVelX)}" + "\n" +
+                        $"Y: {(targetVelY > 0 ? " " : "-")}{Math.Abs(targetVelY)}" + "\n" +
+                        $"Z: {(targetVelZ > 0 ? " " : "-")}{Math.Abs(targetVelZ)}" + "\n";
+                }
+                else
+                {
+                    _dockingOverlayText.text =
+                        $"Target: None";
+                }
+            }
+        }
+
+        public void Destroy()
+        {
+            if (_uiCanvas != null)
+            {
+                UnityEngine.Object.Destroy(_uiCanvas.gameObject);
+                _uiCanvas = null;
+                _dockingOverlayText = null;
+            }
         }
     }
 }

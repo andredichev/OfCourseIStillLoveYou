@@ -21,8 +21,6 @@ namespace OfCourseIStillLoveYou
         private const float MaxCameraSize = 360;
         private const string Altitude = "ALTITUDE: ", Km = " KM", Speed = "SPEED: ", Kmh = " KM/H";
 
-        private bool HasTargetData = false;
-
         private static readonly float controlsStartY = 22;
         private static readonly Font TelemetryFont = Font.CreateDynamicFontFromOSFont("Bahnschrift Semibold", 16);
 
@@ -33,20 +31,8 @@ namespace OfCourseIStillLoveYou
         private static readonly GUIStyle TelemetryGuiStyle = new GUIStyle()
         { alignment = TextAnchor.MiddleCenter, normal = new GUIStyleState() { textColor = Color.white }, fontStyle = FontStyle.Bold, font = TelemetryFont };
 
-
-        public string targetName;
-        public string currentMode;
-
-        public double targetDistance = double.NaN;
-        public double targetRelVelocity = double.NaN;
-        public double targetVelX;
-        public double targetVelY;
-        public double targetVelZ;
-
-        private Canvas _uiCanvas;
-        private Text _dockingOverlayText;
-
-        HullcamVDS.CameraFilter.eCameraMode cameraMode;
+        HullcamVDS.CameraFilter.eCameraMode _cameraMode;
+        MovieTimeFilterWrapper _filter;
 
         public static Texture2D ResizeTexture =
             GameDatabase.Instance.GetTexture("OfCourseIStillLoveYou/Textures/" + "resizeSquare", false);
@@ -96,6 +82,12 @@ namespace OfCourseIStillLoveYou
 
         public void UpdateCameras()
         {
+            if (_filter != null)
+                _filter.Update();
+
+            if (sunflareManager != null)
+                sunflareManager.UpdateFlares();
+
             for (int i = _cameras.Count - 1; i >= 0; --i)
             {
                 if (_cameras[i] != null)
@@ -104,9 +96,6 @@ namespace OfCourseIStillLoveYou
                     _cameras[i].Render();
                 }
             }
-
-            if (sunflareManager != null)
-                sunflareManager.UpdateFlares();
         }
 
 
@@ -329,7 +318,7 @@ namespace OfCourseIStillLoveYou
             // EVE (clouds, water effects)
             EVEWrapper.ApplyEVEToCamera(partNearCamera, mainCamera);
 
-            cameraMode = (HullcamVDS.CameraFilter.eCameraMode)_hullcamera.cameraMode;
+            _cameraMode = (HullcamVDS.CameraFilter.eCameraMode)_hullcamera.cameraMode;
             ApplyCameraFilter(partNearCamera);
 
             // === SET CAMERA NAMES (MUST BE LAST - CopyFrom overwrites names) ===
@@ -340,69 +329,15 @@ namespace OfCourseIStillLoveYou
 
         private void ApplyCameraFilter(Camera camera)
         {
-            var filter = camera.gameObject.AddComponent<MovieTimeFilterWrapper>();
-            if (filter != null)
+            _filter = camera.gameObject.AddComponent<MovieTimeFilterWrapper>();
+            if (_filter != null)
             {
-                filter.Initialize(camera.name + "Filter", MovieTimeFilterWrapper.eFilterType.Flight);
-                filter.SetMode(cameraMode);
+                _filter.Initialize(camera.name + "Filter", MovieTimeFilterWrapper.eFilterType.Flight);
+                _filter.SetMode(_cameraMode);
+
+                if (_cameraMode == CameraFilter.eCameraMode.DockingCam)
+                    _filter.AttachDockingOverlayToCamera(camera, _adjCamImageWidthSize, _adjCamImageHeightSize, TargetWindowScale);
             }
-
-            if (cameraMode == HullcamVDS.CameraFilter.eCameraMode.DockingCam)
-                AttachDockingOverlayToCamera(camera);
-        }
-
-        private void AttachDockingOverlayToCamera(Camera camera)
-        {
-            int uiLayer = LayerMask.NameToLayer("UI");
-            if (uiLayer == -1) uiLayer = 5;
-
-            camera.cullingMask |= 1 << uiLayer;
-
-            GameObject uiGo = new GameObject("OCISLY_HUD");
-            uiGo.layer = uiLayer;
-            uiGo.transform.SetParent(camera.transform, false);
-
-            _uiCanvas = uiGo.AddComponent<Canvas>();
-            _uiCanvas.renderMode = RenderMode.ScreenSpaceCamera;
-            _uiCanvas.worldCamera = camera;
-            _uiCanvas.planeDistance = 0.1f;
-
-            var scaler = uiGo.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
-
-            var tgtGO = new GameObject("DockingOverlay");
-            tgtGO.layer = uiLayer;
-            tgtGO.transform.SetParent(uiGo.transform, false);
-
-            var outline = tgtGO.AddComponent<Outline>();
-            outline.effectColor = Color.black;
-            outline.effectDistance = new Vector2(2, -2);
-
-            _dockingOverlayText = tgtGO.AddComponent<Text>();
-            _dockingOverlayText.font = Font.CreateDynamicFontFromOSFont("Courier New", 16);
-            _dockingOverlayText.fontSize = 2 * (int)Mathf.Clamp(16 * TargetWindowScale, 9, 16);
-            _dockingOverlayText.alignment = TextAnchor.UpperLeft;
-            _dockingOverlayText.color = Color.white;
-            _dockingOverlayText.raycastTarget = false;
-
-            var rtTgt = _dockingOverlayText.rectTransform;
-            rtTgt.anchorMin = new Vector2(0f, 1f);
-            rtTgt.anchorMax = new Vector2(0f, 1f);
-            rtTgt.pivot = new Vector2(0f, 1f);
-
-            float texW = Settings.Width;
-            float texH = Settings.Height;
-            float dispW = _adjCamImageWidthSize;
-            float dispH = _adjCamImageHeightSize;
-            float scale = Mathf.Max(dispW / texW, dispH / texH);
-            float visibleW = dispW / scale;
-            float visibleH = dispH / scale;
-            float offsetX = (texW - visibleW) / 2f;
-            float offsetY = (texH - visibleH) / 2f;
-
-            float padding = 5f;
-            rtTgt.anchoredPosition = new Vector2(offsetX + padding, -offsetY - padding);
-            rtTgt.sizeDelta = new Vector2(visibleW - 2f * padding, visibleH - 2f * padding);
         }
 
         public void CreateGui()
@@ -531,49 +466,6 @@ namespace OfCourseIStillLoveYou
             SpeedString = string.Concat(Speed, speed, Kmh);
         }
 
-        public void UpdateDockingOverlay()
-        {
-            HasTargetData = (FlightGlobals.ActiveVessel.targetObject is Vessel || FlightGlobals.ActiveVessel.targetObject is ModuleDockingNode);
-            if (_dockingOverlayText != null)
-            {
-                if (HasTargetData)
-                {
-                    targetName = FlightGlobals.fetch.VesselTarget.GetName();
-                    targetVelX = Math.Round(Vector3d.Dot(FlightGlobals.ship_tgtVelocity, FlightGlobals.ActiveVessel.ReferenceTransform.right), 3);
-                    targetVelY = Math.Round(Vector3d.Dot(FlightGlobals.ship_tgtVelocity, FlightGlobals.ActiveVessel.ReferenceTransform.forward), 3);
-                    targetVelZ = Math.Round(Vector3d.Dot(FlightGlobals.ship_tgtVelocity, FlightGlobals.ActiveVessel.ReferenceTransform.up), 3);
-
-                    Vessel targetVessel;
-                    if (FlightGlobals.ActiveVessel.targetObject is Vessel)
-                        targetVessel = (Vessel)FlightGlobals.ActiveVessel.targetObject;
-                    else
-                        targetVessel = ((ModuleDockingNode)FlightGlobals.ActiveVessel.targetObject).vessel;
-                    Orbit activeOrbit = FlightGlobals.ActiveVessel.orbit;
-                    Orbit targetOrbit = targetVessel.orbit;
-
-                    Vector3d activeVesselPos = FlightGlobals.ActiveVessel.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime()) + FlightGlobals.ActiveVessel.orbit.referenceBody.position;
-                    Vector3d targetVesselPos = targetVessel.orbit.getRelativePositionAtUT(Planetarium.GetUniversalTime()) + targetVessel.orbit.referenceBody.position;
-
-                    targetDistance = (activeVesselPos - targetVesselPos).magnitude;
-
-                    _dockingOverlayText.text =
-                        $"Target: {targetName}"                                    + "\n" +
-                        $"DST:    {Math.Round(targetDistance, 2)} m"               + "\n" +
-                        $"TCA:    "                                                + "\n" +
-                        $""                                                        + "\n" +
-                        $"Relative Speed"                                          + "\n" +
-                        $"X: {(targetVelX > 0 ? " " : "-")}{Math.Abs(targetVelX)}" + "\n" +
-                        $"Y: {(targetVelY > 0 ? " " : "-")}{Math.Abs(targetVelY)}" + "\n" +
-                        $"Z: {(targetVelZ > 0 ? " " : "-")}{Math.Abs(targetVelZ)}" + "\n" ;
-                }
-                else
-                {
-                    _dockingOverlayText.text =
-                        $"Target: None";
-                }
-            }
-        }
-
         private void UpdateTargetScale(float diff)
         {
             var scaleDiff = diff / (_windowRect.width + _windowRect.height) * 100 * .01f;
@@ -619,13 +511,6 @@ namespace OfCourseIStillLoveYou
             StreamingEnabled = false;
 
             _jpgTexture = null;
-
-            if (_uiCanvas != null)
-            {
-                UnityEngine.Object.Destroy(_uiCanvas.gameObject);
-                _uiCanvas = null;
-                _dockingOverlayText = null;
-            }
 
             if (TargetCamRenderTexture != null)
             {
