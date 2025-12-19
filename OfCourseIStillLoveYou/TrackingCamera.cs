@@ -255,10 +255,6 @@ namespace OfCourseIStillLoveYou
             partScaledCamera.forceIntoRenderTexture = true;
             _cameras.Add(partScaledCamera);
 
-            TufxWrapper.AddPostProcessing(partScaledCamera);
-            DeferredWrapper.EnableDeferredRendering(partScaledCamera);
-            DeferredWrapper.SyncDebugMode(partScaledCamera);
-
             // Sync rotation with near camera
             var camRotator = cam2Obj.AddComponent<TgpCamRotator>();
             camRotator.NearCamera = partNearCamera;
@@ -285,10 +281,6 @@ namespace OfCourseIStillLoveYou
             galaxyCam.enabled = false;
             galaxyCam.forceIntoRenderTexture = true;
             _cameras.Add(galaxyCam);
-
-            TufxWrapper.AddPostProcessing(galaxyCam);
-            DeferredWrapper.EnableDeferredRendering(galaxyCam);
-            DeferredWrapper.SyncDebugMode(galaxyCam);
 
             var camRotatorGalaxy = galaxyCamObj.AddComponent<TgpCamRotator>();
             camRotatorGalaxy.NearCamera = partNearCamera;
