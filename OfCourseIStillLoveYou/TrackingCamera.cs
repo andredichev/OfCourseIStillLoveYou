@@ -97,8 +97,13 @@ namespace OfCourseIStillLoveYou
         public void UpdateCameras()
         {
             for (int i = _cameras.Count - 1; i >= 0; --i)
+            {
                 if (_cameras[i] != null)
+                {
+                    _cameras[i].fieldOfView = _hullcamera.cameraFoV;
                     _cameras[i].Render();
+                }
+            }
 
             if (sunflareManager != null)
                 sunflareManager.UpdateFlares();
@@ -107,6 +112,7 @@ namespace OfCourseIStillLoveYou
 
         public void LateUpdateCameras()
         {
+            // disabled due to performance issues
             //ScattererWrapper.ForceEnableScattererComponents(_cameras[0]);
             //ScattererOceanHelper.UpdateOceanForCamera(_cameras[0]);
 
@@ -302,11 +308,11 @@ namespace OfCourseIStillLoveYou
             // === VISUAL EFFECTS (Apply to NearCamera) ===
 
             // Scatterer (atmosphere, ocean)
-            //ScattererWrapper.ApplyScattererToCamera(partNearCamera);
+            //ScattererWrapper.ApplyScattererToCamera(partNearCamera); // disabled due to performance issues
 
             // Initialize Scatterer ocean rendering
             //if (ScattererWrapper.IsScattererAvailable)
-            //    ScattererOceanHelper.FindOceanNode(_hullcamera.vessel.mainBody.name);
+            //    ScattererOceanHelper.FindOceanNode(_hullcamera.vessel.mainBody.name); // disabled due to performance issues
 
             // Scatterer SunFlare
             try
@@ -326,9 +332,6 @@ namespace OfCourseIStillLoveYou
             cameraMode = (HullcamVDS.CameraFilter.eCameraMode)_hullcamera.cameraMode;
             ApplyCameraFilter(partNearCamera);
 
-            if (cameraMode == HullcamVDS.CameraFilter.eCameraMode.DockingCam)
-                AttachDockingOverlayToCamera(partNearCamera);
-
             // === SET CAMERA NAMES (MUST BE LAST - CopyFrom overwrites names) ===
             _cameras[0].name = "jrNear";
             _cameras[1].name = "jrScaled";
@@ -343,6 +346,9 @@ namespace OfCourseIStillLoveYou
                 filter.Initialize(camera.name + "Filter", MovieTimeFilterWrapper.eFilterType.Flight);
                 filter.SetMode(cameraMode);
             }
+
+            if (cameraMode == HullcamVDS.CameraFilter.eCameraMode.DockingCam)
+                AttachDockingOverlayToCamera(camera);
         }
 
         private void AttachDockingOverlayToCamera(Camera camera)
@@ -474,10 +480,6 @@ namespace OfCourseIStillLoveYou
 
         private Rect DrawTexture()
         {
-            // update FOV
-            foreach (var camera in _cameras)
-                camera.fieldOfView = _hullcamera.cameraFoV;
-
             var imageRect = new Rect(2, 20, _adjCamImageWidthSize, _adjCamImageHeightSize);
 
             GUI.DrawTexture(imageRect, TargetCamRenderTexture, ScaleMode.ScaleAndCrop , false);
